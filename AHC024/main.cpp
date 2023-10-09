@@ -2,13 +2,13 @@
 
 using namespace std; 
 
-bool debug = true;
+bool debug = false;
 const int N = 50;
 const int M = 100;
 const int DY[4] = {1, -1, 0, 0};
 const int DX[4] = {0, 0, 1, -1};
 vector<vector<int>> C(N, vector<int>(N));
-vector<vector<bool>> origin_adjant_mat(M + 1, vector<bool>(M + 1));
+vector<vector<int>> origin_adjant_mat(M + 1);
 
 inline double get_time() {
     return chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
@@ -27,14 +27,14 @@ unsigned int randxor()
 }
 
 // 色ごとの隣接関係を行列で表す
-vector<vector<bool>> get_adjant_mat(vector<vector<int>> C) {
-    vector<vector<bool>> adjant_mat(M + 1, vector<bool>(M + 1));
+vector<vector<int>> get_adjant_mat(vector<vector<int>> C) {
+    vector<set<int>> neighbor(M + 1);
     for(int i = 0; i < N; i++) {
         for(int j = 0; j < N - 1; j++) {
             int a = C[i][j], b = C[i][j + 1];
             if(a != b) {
-                adjant_mat[a][b] = true;
-                adjant_mat[b][a] = true;
+                neighbor[a].insert(b);
+                neighbor[b].insert(a);
             }
         }
     }
@@ -42,8 +42,8 @@ vector<vector<bool>> get_adjant_mat(vector<vector<int>> C) {
         for(int j = 0; j < N; j++) {
             int a = C[i][j], b = C[i + 1][j];
             if(a != b) {
-                adjant_mat[a][b] = true;
-                adjant_mat[b][a] = true;
+                neighbor[a].insert(b);
+                neighbor[b].insert(a);
             }
         }
     }
@@ -52,8 +52,8 @@ vector<vector<bool>> get_adjant_mat(vector<vector<int>> C) {
         for(int j = 0; j < N; j++) {
             int a = C[i][j], b = 0;
             if(a != b) {
-                adjant_mat[a][b] = true;
-                adjant_mat[b][a] = true;
+                neighbor[a].insert(b);
+                neighbor[b].insert(a);
             }
         }
     }
@@ -62,20 +62,32 @@ vector<vector<bool>> get_adjant_mat(vector<vector<int>> C) {
         for(int j: {0, N - 1}) {
             int a = C[i][j], b = 0;
             if(a != b) {
-                adjant_mat[a][b] = true;
-                adjant_mat[b][a] = true;
+                neighbor[a].insert(b);
+                neighbor[b].insert(a);
             }
         }
     }
 
-    return adjant_mat;
+    vector<vector<int>> ret_neighbor(M + 1);
+    for(int i = 0; i < M + 1; i++) {
+        for(auto it = neighbor[i].begin(); it != neighbor[i].end(); it++) {
+            ret_neighbor[i].push_back(*it);
+        }
+    }
+
+
+    return ret_neighbor;
 }
 
 bool is_valid_C(vector<vector<int>> C) {
-    vector<vector<bool>> adjant_mat = get_adjant_mat(C);
+    vector<vector<int>> adjant_mat = get_adjant_mat(C);
     for(int i = 0; i < M + 1; i++) {
-        for(int j = 0; j < M + 1; j++) {
-            if(origin_adjant_mat[i][j] != adjant_mat[i][j]) {
+        if(adjant_mat[i].size() != origin_adjant_mat[i].size()) {
+            return false;
+        }
+
+        for(int j = 0; j < adjant_mat[i].size(); j++) {
+            if(adjant_mat[i][j] != origin_adjant_mat[i][j]) {
                 return false;
             }
         }
@@ -181,20 +193,6 @@ void init() {
     origin_adjant_mat = get_adjant_mat(C);
 }
 
-bool can_remove_row(vector<vector<int>> C, int i) {
-    for(int j = 0; j < N; j++) if(C[i][j] != 0) {
-        return true;
-    }
-    return false;
-}
-
-bool can_remove_col(vector<vector<int>> C, int j) {
-    for(int i = 0; i < N; i++) if(C[i][j] != 0) {
-        return true;
-    }
-    return false;
-}
-
 int get_score(vector<vector<int>> C) {
     int score = 1;
     for(int i = 0; i < N; i++) {
@@ -210,32 +208,35 @@ int get_score(vector<vector<int>> C) {
 void solve() {
 
     // 行と列の削除
+
+    int row_remove_cnt = 0, col_remove_cnt = 0;
     while(get_time() - start_time < 1900) {
         iter_cnt++;
         bool updated = false;
         for(int k = 0; k < N; k++) {
             // 行の削除
-            if(can_remove_row(C, k)) {
+            if(k + row_remove_cnt < N) {
                 vector<vector<int>> new_C = row_delete(C, k);
                 if(is_valid_C(new_C)) {
                     C = new_C;
                     updated = true;
+                    row_remove_cnt++;
                 }
             }
 
             // 列の削除
-            if(can_remove_col(C, k)) {
+            if(k + col_remove_cnt < N) {
                 vector<vector<int>> new_C = col_delete(C, k);
                 if(is_valid_C(new_C)) {
                     C = new_C;
                     updated = true;
+                    col_remove_cnt++;
                 }
             }
         }        
 
         if(!updated) {
             C = change_color(C);
-            // break;
         }
     }
 }
@@ -277,6 +278,5 @@ int main() {
     init();
     solve();
     output();
-
     return 0;
 }
