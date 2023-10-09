@@ -2,20 +2,19 @@
 
 using namespace std; 
 
-bool debug = false;
+bool debug = true;
 const int N = 50;
 const int M = 100;
 const int DY[4] = {1, -1, 0, 0};
 const int DX[4] = {0, 0, 1, -1};
 vector<vector<int>> C(N, vector<int>(N));
-vector<vector<int>> origin_adjant_mat(M + 1);
+vector<vector<bool>> origin_adjant_mat(M + 1, vector<bool>(M + 1));
 
 inline double get_time() {
     return chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
 }
 
 double start_time = get_time();
-int iter_cnt = 0;
 
 unsigned int randxor()
 {
@@ -26,15 +25,19 @@ unsigned int randxor()
     return w = (w ^ (w >> 19)) ^ (t ^ (t >> 8));
 }
 
+bool inside(int y, int x) {
+    return 0 <= y && y < N && 0 <= x && x < N;
+}
+
 // 色ごとの隣接関係を行列で表す
-vector<vector<int>> get_adjant_mat(vector<vector<int>> C) {
-    vector<set<int>> neighbor(M + 1);
+vector<vector<bool>> get_adjant_mat(vector<vector<int>> C) {
+    vector<vector<bool>> adjant_mat(M + 1, vector<bool>(M + 1));
     for(int i = 0; i < N; i++) {
         for(int j = 0; j < N - 1; j++) {
             int a = C[i][j], b = C[i][j + 1];
             if(a != b) {
-                neighbor[a].insert(b);
-                neighbor[b].insert(a);
+                adjant_mat[a][b] = true;
+                adjant_mat[b][a] = true;
             }
         }
     }
@@ -42,8 +45,8 @@ vector<vector<int>> get_adjant_mat(vector<vector<int>> C) {
         for(int j = 0; j < N; j++) {
             int a = C[i][j], b = C[i + 1][j];
             if(a != b) {
-                neighbor[a].insert(b);
-                neighbor[b].insert(a);
+                adjant_mat[a][b] = true;
+                adjant_mat[b][a] = true;
             }
         }
     }
@@ -52,8 +55,8 @@ vector<vector<int>> get_adjant_mat(vector<vector<int>> C) {
         for(int j = 0; j < N; j++) {
             int a = C[i][j], b = 0;
             if(a != b) {
-                neighbor[a].insert(b);
-                neighbor[b].insert(a);
+                adjant_mat[a][b] = true;
+                adjant_mat[b][a] = true;
             }
         }
     }
@@ -62,36 +65,25 @@ vector<vector<int>> get_adjant_mat(vector<vector<int>> C) {
         for(int j: {0, N - 1}) {
             int a = C[i][j], b = 0;
             if(a != b) {
-                neighbor[a].insert(b);
-                neighbor[b].insert(a);
+                adjant_mat[a][b] = true;
+                adjant_mat[b][a] = true;
             }
         }
     }
 
-    vector<vector<int>> ret_neighbor(M + 1);
-    for(int i = 0; i < M + 1; i++) {
-        for(auto it = neighbor[i].begin(); it != neighbor[i].end(); it++) {
-            ret_neighbor[i].push_back(*it);
-        }
-    }
-
-
-    return ret_neighbor;
+    return adjant_mat;
 }
 
 bool is_valid_C(vector<vector<int>> C) {
-    vector<vector<int>> adjant_mat = get_adjant_mat(C);
+    vector<vector<bool>> adjant_mat = get_adjant_mat(C);
     for(int i = 0; i < M + 1; i++) {
-        if(adjant_mat[i].size() != origin_adjant_mat[i].size()) {
-            return false;
-        }
-
-        for(int j = 0; j < adjant_mat[i].size(); j++) {
-            if(adjant_mat[i][j] != origin_adjant_mat[i][j]) {
+        for(int j = 0; j < M + 1; j++) {
+            if(origin_adjant_mat[i][j] != adjant_mat[i][j]) {
                 return false;
             }
         }
     }
+
 
     vector<vector<bool>> done(N, vector<bool>(N));
     vector<bool> done_color(M + 1);
@@ -100,7 +92,7 @@ bool is_valid_C(vector<vector<int>> C) {
             if(done[y][x]) continue;
             done[y][x] = true;
             int c = C[y][x];
-            if(done_color[c]) return false;
+            if(c != 0 && done_color[c]) return false;
             done_color[c] = true;
             queue<pair<int, int>> que;
             que.push(make_pair(y, x));
@@ -112,7 +104,7 @@ bool is_valid_C(vector<vector<int>> C) {
                 for(int k = 0; k < 4; k++) {
                     int nx_y = now_y + DY[k];
                     int nx_x = now_x + DX[k];
-                    if(0 <= nx_y && nx_y < N && 0 <= nx_x && nx_x < N){
+                    if(inside(nx_y, nx_x)) {
                         if(!done[nx_y][nx_x] && C[nx_y][nx_x] == c) {
                             que.push(make_pair(nx_y, nx_x));
                             done[nx_y][nx_x] = true;
@@ -131,16 +123,22 @@ bool is_valid_C(vector<vector<int>> C) {
     return true;
 }
 
-vector<vector<int>> row_delete(vector<vector<int>> C, int r) {
+bool row_delete(vector<vector<int>>& C, int r) {
     vector<vector<int>> new_C;
     for(int i = 0; i < N; i++) if(i != r) {
         new_C.push_back(C[i]);
     }
     new_C.push_back(vector<int>(N, 0));
-    return new_C;
+
+    if(is_valid_C(new_C)) {
+        C = new_C;
+        return true;
+    } else {
+        return false;
+    }
 }
 
-vector<vector<int>> col_delete(vector<vector<int>> C, int c) {
+bool col_delete(vector<vector<int>>& C, int c) {
     vector<vector<int>> new_C;
     for(int i = 0; i < N; i++) {
         vector<int> add_C;
@@ -150,10 +148,45 @@ vector<vector<int>> col_delete(vector<vector<int>> C, int c) {
         add_C.push_back(0);
         new_C.push_back(add_C);
     }
-    return new_C;
+
+    if(is_valid_C(new_C)) {
+        C = new_C;
+        return true;
+    } else {
+        return false;
+    }
+
 }
 
-vector<vector<int>> change_color(vector<vector<int>> C) {
+vector<tuple<int, int, int>> point_delete(vector<vector<int>>& C, int y, int x, int length, int d) {
+    vector<tuple<int, int, int>> changes;
+    if(C[y][x] == 0) {
+        return changes;
+    }
+    // どの方向に詰めるか
+    int dy = DY[d], dx = DX[d];
+
+    bool not_break_flag = true;
+    while(inside(y + dy, x + dx)) {
+        changes.push_back(make_tuple(y, x, C[y][x]));
+        C[y][x] = C[y + dy][x + dx];
+        if(C[y][x] == 0) {
+            not_break_flag = false;   
+            break;
+        }
+        y += dy;
+        x += dx;
+    }
+
+    if(not_break_flag) {
+        changes.push_back(make_tuple(y, x, C[y][x]));
+        C[y][x] = 0;
+    }
+
+    return changes;
+}
+
+void change_color(vector<vector<int>>& C) {
     for(int i = 0; i < 1000; i++) {
         int y = randxor() % N;
         int x = randxor() % N;
@@ -167,7 +200,9 @@ vector<vector<int>> change_color(vector<vector<int>> C) {
                 0 <= nx_y && 
                 0 <= nx_x && 
                 nx_y < N &&
-                nx_x < N) {
+                nx_x < N) 
+            {
+                if(C[y][x] == C[nx_y][nx_x]) continue;
                 C[y][x] = C[nx_y][nx_x];
             } else {
                 C[y][x] = 0;
@@ -175,10 +210,12 @@ vector<vector<int>> change_color(vector<vector<int>> C) {
 
             if(C[y][x] == 0 || !is_valid_C(C)) {
                 C[y][x] = pre_color;
+            } else {
+                // 一点更新完了
+                break;
             }
         }
     }
-    return C;
 }
 
 void init() {
@@ -191,6 +228,21 @@ void init() {
     }
     // 前処理
     origin_adjant_mat = get_adjant_mat(C);
+
+}
+
+bool can_remove_row(vector<vector<int>> C, int i) {
+    for(int j = 0; j < N; j++) if(C[i][j] != 0) {
+        return true;
+    }
+    return false;
+}
+
+bool can_remove_col(vector<vector<int>> C, int j) {
+    for(int i = 0; i < N; i++) if(C[i][j] != 0) {
+        return true;
+    }
+    return false;
 }
 
 int get_score(vector<vector<int>> C) {
@@ -208,37 +260,107 @@ int get_score(vector<vector<int>> C) {
 void solve() {
 
     // 行と列の削除
-
-    int row_remove_cnt = 0, col_remove_cnt = 0;
-    while(get_time() - start_time < 1900) {
-        iter_cnt++;
+    int remove_row_cnt = 0, remove_col_cnt = 0;
+    while(true) {
         bool updated = false;
         for(int k = 0; k < N; k++) {
             // 行の削除
-            if(k + row_remove_cnt < N) {
-                vector<vector<int>> new_C = row_delete(C, k);
-                if(is_valid_C(new_C)) {
-                    C = new_C;
+            if(can_remove_row(C, k)) {
+                bool updated_row = row_delete(C, k);
+                if(updated_row) {
                     updated = true;
-                    row_remove_cnt++;
+                    remove_row_cnt++;
                 }
             }
 
             // 列の削除
-            if(k + col_remove_cnt < N) {
-                vector<vector<int>> new_C = col_delete(C, k);
-                if(is_valid_C(new_C)) {
-                    C = new_C;
+            if(can_remove_col(C, k)) {
+                bool updated_col = col_delete(C, k);
+                if(updated_col) {
                     updated = true;
-                    col_remove_cnt++;
+                    remove_col_cnt++;
                 }
             }
         }        
 
         if(!updated) {
-            C = change_color(C);
+            break;
         }
     }
+
+    // 山登り
+    int iter_cnt = 0;
+    int cutoff_max_length = 15;
+    while(get_time() - start_time < 1900) {
+        iter_cnt++;
+
+        int m = rand() % 3;
+        int length = rand() % cutoff_max_length + 1;
+        int y = rand() % (N - remove_row_cnt);
+        int x = rand() % (N - remove_col_cnt);
+        if(C[y][x] == 0) {
+            continue;
+        }
+
+        if(m == 0) {
+            // 行の一部削除（詰める方向はd = 0, 1)
+            vector<tuple<int, int, int>> all_changes;
+
+            if(can_remove_row(C, y)) {
+                int d = rand() % 2;
+                for(int j = x; j < min(N, x + length); j++) {
+                    vector<tuple<int, int, int>> changes = point_delete(C, y, j, length, d);
+                    for(auto change: changes) {
+                        all_changes.push_back(change);
+                    }
+                }
+            }
+
+            if(!is_valid_C(C)) {
+                // rollback
+                for(auto change: all_changes) {
+                    int y = get<0>(change);
+                    int x = get<1>(change);
+                    int e = get<2>(change);
+                    C[y][x] = e;
+                }
+            }
+
+        } else if(m == 1) {
+            // 列の削除(詰める報告 d = 2, 3)
+            vector<tuple<int, int, int>> all_changes;
+            if(can_remove_col(C, x)) {
+                int d = rand() % 2 + 2;
+                for(int i = y; i < min(N, y + length); i++) {
+                    vector<tuple<int, int, int>> changes = point_delete(C, i, x, length, d);
+                    for(auto change: changes) {
+                        all_changes.push_back(change);
+                    }
+                }
+            }
+
+            if(!is_valid_C(C)) {
+                // rollback
+                for(auto change: all_changes) {
+                    int y = get<0>(change);
+                    int x = get<1>(change);
+                    int e = get<2>(change);
+                    C[y][x] = e;
+                }
+            }
+
+        } else {
+            // 色の変換
+            // TODO 真ん中に向かってコピーしたい、複数同時に変更する
+            change_color(C);
+            // change_color(C);
+            // change_color(C);
+            // change_color(C);
+        }
+    }
+
+    // std::cout << iter_cnt << endl;
+
 }
 
 void output() {
@@ -258,25 +380,26 @@ void output() {
         }
         writing_file.close();
 
-        cout << "SCORE : " << get_score(C) << endl;
-        cout << "iter_cnt : "  << iter_cnt << endl;
+        std::cout << "SCORE : " << get_score(C) << endl;
 
     } else {
         for(int i = 0; i < N; i++) {
             for(int j = 0; j < N; j++) {
-                cout << C[i][j];
+                std::cout << C[i][j];
                 if(j + 1 != N) {
-                    cout << " ";
+                    std::cout << " ";
                 }
             }
-            cout << endl;
+            std::cout << endl;
         }
     }
+
 }
 
 int main() {
     init();
     solve();
     output();
+
     return 0;
 }
