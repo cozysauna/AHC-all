@@ -2,7 +2,7 @@
 
 using namespace std; 
 
-bool debug = true;
+bool debug = false;
 const int N = 50;
 const int M = 100;
 const int DY[4] = {1, -1, 0, 0};
@@ -191,6 +191,7 @@ void change_color(vector<vector<int>>& C) {
         int y = randxor() % N;
         int x = randxor() % N;
         if(C[y][x] != 0) {
+        // if(true) {
             int d = randxor() % 4;
             int nx_y = y + DY[d];
             int nx_x = x + DX[d];
@@ -208,7 +209,8 @@ void change_color(vector<vector<int>>& C) {
                 C[y][x] = 0;
             }
 
-            if(C[y][x] == 0 || !is_valid_C(C)) {
+            // if(C[y][x] == 0 || !is_valid_C(C)) {
+            if(!is_valid_C(C)) {
                 C[y][x] = pre_color;
             } else {
                 // 一点更新完了
@@ -257,7 +259,47 @@ int get_score(vector<vector<int>> C) {
     return score;
 }
 
+bool is_change(int max_score, int tmp_score) {
+    return max_score <= tmp_score;
+}
+
+vector<vector<int>> modified_C(vector<vector<int>> C) {
+    vector<int> top(M + 1, M + 1);
+    vector<int> bot(M + 1, 0);
+    vector<int> lef(M + 1, M + 1);
+    vector<int> rig(M + 1, 0);
+    for(int i = 0; i < N; i++) {
+        for(int j = 0; j < N; j++) {
+            int c = C[i][j];
+            top[c] = min(top[c], i);
+            bot[c] = max(bot[c], i);
+            lef[c] = min(lef[c], j);
+            rig[c] = max(rig[c], j);
+        }
+    }
+    for(int c = 1; c < M + 1; c++) {
+        vector<vector<int>> new_C(N, vector<int>(N));
+        for(int i = 0; i < N; i++) {
+            for(int j = 0; j < N; j++) {
+                new_C[i][j] = C[i][j];
+            }
+        }
+        for(int i = top[c]; i <= bot[c]; i++) {
+            for(int j = lef[c]; j <= rig[c]; j++) {
+                new_C[i][j] = c;
+            }
+        }
+        if(is_valid_C(new_C)) {
+            C = new_C;
+        }
+    }
+    return C;
+}
+
 void solve() {
+
+    // Cの線が直線になるように変化させる
+    C = modified_C(C);
 
     // 行と列の削除
     int remove_row_cnt = 0, remove_col_cnt = 0;
@@ -291,8 +333,15 @@ void solve() {
     // 山登り
     int iter_cnt = 0;
     int cutoff_max_length = 15;
+    int max_iter_cnt = 65500;
+    // int max_iter_cnt = 205500;
+    int max_score = get_score(C);
     while(get_time() - start_time < 1900) {
+    // for(int iter = 0; iter < max_iter_cnt; iter++) {
         iter_cnt++;
+        // if(iter_cnt % 1000 == 0) {
+        //     cout << "iter_cnt: " << iter_cnt << " SCORE: " << get_score(C) << endl;
+        // }
 
         int m = rand() % 3;
         int length = rand() % cutoff_max_length + 1;
@@ -316,6 +365,8 @@ void solve() {
                 }
             }
 
+            // int tmp_score = get_score(C);
+            // if(!is_valid_C(C) || !is_change(max_score, tmp_score)) {
             if(!is_valid_C(C)) {
                 // rollback
                 for(auto change: all_changes) {
@@ -324,7 +375,11 @@ void solve() {
                     int e = get<2>(change);
                     C[y][x] = e;
                 }
-            }
+            } 
+            // else {
+            //     max_score = tmp_score;
+            // }
+
 
         } else if(m == 1) {
             // 列の削除(詰める報告 d = 2, 3)
@@ -339,6 +394,8 @@ void solve() {
                 }
             }
 
+            // int tmp_score = get_score(C);
+            // if(!is_valid_C(C) || !is_change(max_score, tmp_score)) {
             if(!is_valid_C(C)) {
                 // rollback
                 for(auto change: all_changes) {
@@ -347,13 +404,15 @@ void solve() {
                     int e = get<2>(change);
                     C[y][x] = e;
                 }
-            }
+            } 
+            // else {
+            //     max_score = tmp_score;
+            // }
 
         } else {
             // 色の変換
             // TODO 真ん中に向かってコピーしたい、複数同時に変更する
             change_color(C);
-            // change_color(C);
             // change_color(C);
             // change_color(C);
         }
@@ -380,17 +439,17 @@ void output() {
         }
         writing_file.close();
 
-        std::cout << "SCORE : " << get_score(C) << endl;
+        cout << "SCORE : " << get_score(C) << endl;
 
     } else {
         for(int i = 0; i < N; i++) {
             for(int j = 0; j < N; j++) {
-                std::cout << C[i][j];
+                cout << C[i][j];
                 if(j + 1 != N) {
-                    std::cout << " ";
+                    cout << " ";
                 }
             }
-            std::cout << endl;
+            cout << endl;
         }
     }
 
